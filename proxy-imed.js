@@ -1,5 +1,8 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
 
 const app = express();
 app.use(express.json());
@@ -9,6 +12,42 @@ const PORT = process.env.PORT || 3000;
 // Credenciales desde variables de entorno
 const IMED_RUT = process.env.IMED_RUT || '';
 const IMED_PASS = process.env.IMED_PASS || '';
+
+// Configurar el directorio de cach√© de Puppeteer
+const setupPuppeteerCache = () => {
+  // Intentar usar el directorio cach√© por defecto, pero si no existe o no es accesible,
+  // usar /tmp como alternativa
+  const defaultCacheDir = path.join(os.homedir(), '.cache', 'puppeteer');
+  const tmpCacheDir = path.join('/tmp', 'puppeteer-cache');
+
+  let cacheDir = process.env.PUPPETEER_CACHE_DIR;
+
+  if (!cacheDir) {
+    // Intentar usar el directorio por defecto
+    try {
+      if (!fs.existsSync(defaultCacheDir)) {
+        fs.mkdirSync(defaultCacheDir, { recursive: true });
+      }
+      cacheDir = defaultCacheDir;
+    } catch (e) {
+      // Si falla, usar /tmp
+      console.log('No se puede escribir en directorio por defecto, usando /tmp');
+      try {
+        if (!fs.existsSync(tmpCacheDir)) {
+          fs.mkdirSync(tmpCacheDir, { recursive: true });
+        }
+        cacheDir = tmpCacheDir;
+      } catch (e2) {
+        console.log('Error creando directorios de cach√©:', e2.message);
+        cacheDir = tmpCacheDir;
+      }
+    }
+  }
+
+  process.env.PUPPETEER_CACHE_DIR = cacheDir;
+  console.log('Directorio de cach√© de Puppeteer:', cacheDir);
+  return cacheDir;
+};
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK' });
@@ -22,16 +61,48 @@ app.post('/api/imed/licencias', async (req, res) => {
       return res.status(400).json({ error: 'IMED_RUT y IMED_PASS no configurados' });
     }
 
+    // Configurar cach√©
+    const cacheDir = setupPuppeteerCache();
+
     // Iniciar navegador
-    browser = await puppeteer.launch({
+    console.log('Lanzando Puppeteer...');
+
+    // Opciones para Puppeteer
+    const launchOptions = {
       headless: 'new',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-gpu'
+        '--disable-gpu',
+        '--disable-extensions'
       ]
-    });
+    };
+
+    // Si se proporciona una ruta ejecutable, usarla
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+      launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+      console.log('Usando Chrome en:', launchOptions.executablePath);
+    }
+
+    try {
+      browser = await puppeteer.launch(launchOptions);
+    } catch (puppeteerError) {
+      console.error('Error al lanzar Puppeteer:', puppeteerError.message);
+
+      // Si el error es por Chrome no encontrado, intentar informaci√≥n adicional
+      if (puppeteerError.message.includes('Could not find Chrome')) {
+        console.log('Chrome no encontrado. Intentando obtener informaci√≥n del sistema...');
+        const BrowserFetcher = puppeteer.BrowserFetcher ? puppeteer.BrowserFetcher : null;
+        if (BrowserFetcher) {
+          console.log('BrowserFetcher disponible');
+        } else {
+          console.log('BrowserFetcher no disponible - usar puppeteer.launch solo');
+        }
+      }
+
+      throw puppeteerError;
+    }
 
     const page = await browser.newPage();
     page.setDefaultTimeout(30000);
@@ -136,6 +207,7 @@ app.post('/api/imed/licencias', async (req, res) => {
 
   } catch (error) {
     console.error('Error:', error.message);
+    console.error('Stack:', error.stack);
     res.status(500).json({
       success: false,
       error: error.message
@@ -148,5 +220,7 @@ app.post('/api/imed/licencias', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Proxy iMed ejecutándose en puerto ${PORT}`);
+  console.log(`Proxy iMed ejecut√°ndose en puerto ${PORT}`);
+  // Configurar cach√© al iniciar
+  setupPuppeteerCache();
 });

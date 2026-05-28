@@ -10,6 +10,35 @@ const PORT = process.env.PORT || 3000;
 const IMED_RUT = process.env.IMED_RUT || '';
 const IMED_PASS = process.env.IMED_PASS || '';
 
+// Ensure Chromium/Chrome is available for Puppeteer
+async function ensureBrowser() {
+    try {
+          // Try to launch browser to check if it's available
+          const testBrowser = await puppeteer.launch({
+                  headless: 'new',
+                  args: ['--no-sandbox', '--disable-setuid-sandbox']
+          });
+          await testBrowser.close();
+          console.log('Browser is available');
+          return true;
+    } catch (err) {
+          console.log('Browser not found, attempting to fetch...');
+          try {
+                  const browserFetcher = puppeteer.createBrowserFetcher();
+                  const revisions = await browserFetcher.localRevisions();
+                  if (revisions.length === 0) {
+                            console.log('Downloading Chrome...');
+                            await browserFetcher.download('latest');
+                  }
+                  console.log('Browser fetched successfully');
+                  return true;
+          } catch (fetchErr) {
+                  console.error('Failed to fetch browser:', fetchErr.message);
+                  throw new Error('Could not initialize browser. ' + fetchErr.message);
+          }
+    }
+}
+
 app.get('/health', (req, res) => {
   res.json({ status: 'OK' });
 });
@@ -21,6 +50,9 @@ app.post('/api/imed/licencias', async (req, res) => {
     if (!IMED_RUT || !IMED_PASS) {
       return res.status(400).json({ error: 'IMED_RUT y IMED_PASS no configurados' });
     }
+
+        // Ensure browser is available
+        await ensureBrowser();
 
     // Iniciar navegador
     browser = await puppeteer.launch({

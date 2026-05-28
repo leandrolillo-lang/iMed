@@ -1,0 +1,17 @@
+{
+  "name": "proxy-imed",
+  "version": "1.0.0",
+  "description": "Proxy para acceder a iMed con Puppeteer",
+  "main": "proxy-imed.js",
+  "scripts": {
+    "start": "node proxy-imed.js",
+    "dev": "node proxy-imed.js"
+  },
+  "engines": {
+    "node": "18.x"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "puppeteer": "^21.0.0"
+  }
+}

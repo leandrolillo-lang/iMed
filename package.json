@@ -4,8 +4,7 @@
   "description": "Proxy para acceder a iMed con Puppeteer",
   "main": "proxy-imed.js",
   "scripts": {
-    "start": "node proxy-imed.js",
-    "dev": "node proxy-imed.js"
+    "start": "npx puppeteer browsers install chrome && node proxy-imed.js",    "dev": "node proxy-imed.js"
   },
   "engines": {
     "node": "18.x"

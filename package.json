@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node proxy-imed.js",
     "dev": "node proxy-imed.js"
+        "postinstall": "npx puppeteer browsers install chrome"
   },
   "engines": {
     "node": "18.x"
